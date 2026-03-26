@@ -72,12 +72,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\LearnOpenGL\Libs\GLAD\include;D:\LearnOpenGL\Libs\glfw-3.4\include;</IncludePath>
-    <LibraryPath>$(ProjectDir)..\..\Libs\glfw-3.4\build\src\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDIr)..\Libs\glfw-3.4\include;$(SolutionDIr)..\Libs\GLAD\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDIr)..\Libs\glfw-3.4\build\src\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>
-    </IncludePath>
+    <IncludePath>$(SolutionDIr)..\Libs\glfw-3.4\include;$(SolutionDIr)..\Libs\GLAD\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDIr)..\Libs\glfw-3.4\build\src\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -133,8 +133,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Libs\GLAD\src\glad.c" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\Libs\GLAD\src\glad.c" />
+    <ClCompile Include="HelloWindow\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
