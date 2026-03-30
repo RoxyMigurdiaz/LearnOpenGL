@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <glm/glm.hpp>
 
 class Shader
 {
@@ -18,6 +19,7 @@ public:
 	void setBool(const std::string& name, bool value);
 	void setFloat(const std::string& name, float value);
 	void setInt(const std::string& name, int value);
+	void setMat4(const std::string& name, const glm::mat4& mat4);
 
 	unsigned int programID;
 };
