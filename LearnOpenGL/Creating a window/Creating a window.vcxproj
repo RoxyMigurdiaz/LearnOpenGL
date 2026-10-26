@@ -130,6 +130,9 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\glad\glad.vcxproj">
+      <Project>{50e4a49b-fe90-4909-a169-6ba409569e4c}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\GLFW\GLFW.vcxproj">
       <Project>{67fcfe5e-e8cf-4b15-bcb3-283bc2e4d4dd}</Project>
     </ProjectReference>
