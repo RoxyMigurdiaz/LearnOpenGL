@@ -10,6 +10,8 @@ float vertices[] = {
 
 int main()
 {
-
+	glfwInit();
+	glfwWindowHint(GLFW_VERSION_MAJOR, 3);
+	glfwWindowHint()
 	return 0;
 }
