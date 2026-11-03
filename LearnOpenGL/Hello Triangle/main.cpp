@@ -259,15 +259,6 @@ int EBO()
 
 	glfwSetWindowSizeCallback(window, framebuffer_size_callback);
 
-	unsigned int EBO;
-	glGenBuffers(1, &EBO);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-	// 在绑定VAO时，绑定的最后一个元素缓冲区对象存储为VAO的元素缓冲区对象。
-	// 然后，绑定到VAO也会自动绑定该EBO。
-
 	unsigned int VAO, VBO;
 	glGenBuffers(1, &VBO);
 	glGenVertexArrays(1, &VAO);
@@ -280,8 +271,16 @@ int EBO()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
-	glBindVertexArray(0);
+	// 在绑定VAO时，绑定的最后一个元素缓冲区对象存储为VAO的元素缓冲区对象。
+	// 然后，绑定到VAO也会自动绑定该EBO。
+	// 当目标是GL_ELEMENT_ARRAY_BUFFER的时候，VAO会储存glBindBuffer的函数调用。
+	// ******** EBO需要再VAO绑定之后进行绑定 **********
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
+	glBindVertexArray(0);
 
 
 	unsigned int vertexShader, fragmentShader;
