@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+
+<title>OpenGL 投影矩阵</title>
+
+<meta charset="utf-8">
+<meta name="description" content="如何构造 OpenGL 投影矩阵">
+<meta name="keywords" content="OpenGL, transformation, projection Matrix">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="author" content="Song Ho Ahn">
+<meta name="generator" content="editplus">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://www.songho.ca/opengl/gl_projectionmatrix.html">
+
+<!-- favicon -->
+<link rel="icon" type="image/x-icon" href="https://www.songho.ca/favicon.ico">
+
+<!-- CSS -->
+<link rel="stylesheet" media="screen" href="https://www.songho.ca/css/screen.css">
+<link rel="stylesheet" media="print" href="https://www.songho.ca/css/print.css">
+
+<!-- Javascript -->
+<script src="https://www.songho.ca/js/songho.js" defer></script>
+
+<!-- google adsense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8351951494359118" crossorigin="anonymous">
+</script>
+
+<!-- discord block -->
+<!--
+<script async src="https://cdn.jsdelivr.net/npm/@widgetbot/crate@3">
+let crate = new Crate(
+{
+    server: "1228158675181633536",
+    channel:"1228158675181633539",
+    color: "#888"
+});
+//crate.notify("Post your message");
+</script>
+-->
+
+</head>
+
+
+<body id="opengl/projectionmatrix">
+<div id="wrap">
+
+<div id="menublock" class="include-html" data-html="/menu.html" data-js="/js/menu.js">
+</div>
+
+<!-- main content block (left+right) -->
+<div id="mainblock">
+
+<div id="leftblock">
+<div class="innerblock">
+
+<h1>OpenGL 投影矩阵</h1>
+
+<!-- nav -->
+<div style="clear:both; font-size:80%">
+<a href="https://www.songho.ca/opengl/gl_transform.html#projection">&larr;返回</a>
+</div>
+<div>
+&nbsp;
+</div>
+
+<p>
+<b>相关主题：</b> <a href="https://www.songho.ca/opengl/gl_transform.html">OpenGL 变换</a>, <a href="https://www.songho.ca/opengl/gl_camera.html">相机变换</a>, <a href="https://www.songho.ca/opengl/gl_viewport.html">视口变换</a>
+</p>
+
+<ul class="linklist">
+<li><a href="#overview">概述</a></li>
+<li><a href="#perspective">透视投影</a></li>
+<li><a href="#infinite">无限远平面透视矩阵</a></li>
+<li><a href="#fov">带视场角（FOV）的透视矩阵</a></li>
+<li><a href="#ortho">正交投影</a></li>
+</ul>
+
+<p>
+<b>更新：</b> MathML 版本可在 <a href="https://www.songho.ca/opengl/gl_projectionmatrix_mathml.html">此处</a> 查看。
+</p>
+
+<h2 id="overview">概述</h2>
+<p>
+电脑显示器是一个二维平面。OpenGL 渲染的三维场景必须投影到电脑屏幕上，成为二维图像。GL_PROJECTION <a href="https://www.songho.ca/opengl/gl_matrix.html">矩阵</a> 用于这种投影 <a href="https://www.songho.ca/opengl/gl_transform.html">变换</a>。首先，它将所有顶点数据从眼坐标变换到裁剪坐标。然后，这些裁剪坐标再通过除以裁剪坐标的 <em>w</em> 分量，变换为归一化设备坐标（NDC）。
+</p>
+
+<figure class="fr w40">
+<img src="https://www.songho.ca/opengl/files/gl_frustumclip.png" alt="被视锥裁剪的三角形">
+<figcaption>被视锥裁剪的三角形</figcaption>
+</figure>
+
+<p>
+因此必须记住：裁剪（视锥剔除）和 NDC 变换都整合在 <strong>GL_PROJECTION</strong> <a href="https://www.songho.ca/opengl/gl_matrix.html">矩阵</a> 之中。以下各节说明如何用 6 个参数构建投影矩阵：<em>left</em>、<em>right</em>、<em>bottom</em>、<em>top</em>、<em>near</em> 和 <em>far</em> 边界值。
+</p>
+
+<p>
+注意：视锥剔除（裁剪）是在裁剪坐标中进行的，刚好发生在除以 w<sub>c</sub> 之前。裁剪坐标 x<sub>c</sub>、y<sub>c</sub> 和 z<sub>c</sub> 会与 w<sub>c</sub> 比较进行测试。如果任一裁剪坐标小于 -w<sub>c</sub>，或大于 w<sub>c</sub>，该顶点将被丢弃。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq27.png" width="191" height="15" alt="">
+</p>
+<p>
+随后，OpenGL 会在发生裁剪的位置重建多边形的边。
+</p>
+
+<h2 id="perspective" style="clear:both;">透视投影</h2>
+<figure class="fl w60">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix01.png" alt="OpenGL 透视视锥与 NDC">
+<figcaption>透视视锥与归一化设备坐标（NDC）</figcaption>
+</figure>
+<p>
+在透视投影中，截头金字塔视锥（眼坐标）中的三维点会被映射到一个立方体（NDC）；x 坐标的范围从 [l, r] 映射到 [-1, 1]，y 坐标从 [b, t] 映射到 [-1, 1]，z 坐标从 [-n, -f] 映射到 [-1, 1]。
+</p>
+<p>
+注意：眼坐标定义在右手坐标系中，但 NDC 使用左手坐标系。也就是说，位于原点的相机在眼空间中沿 -Z 轴观察，而在 NDC 中则沿 +Z 轴观察。由于 <strong>glFrustum()</strong> 只接受正的 <em>near</em> 和 <em>far</em> 距离值，在构造 GL_PROJECTION 矩阵时需要对它们取负。
+</p>
+<p>
+请试用 <a href="https://www.songho.ca/opengl/gl_transform.html#example2">GUI 应用程序</a>，通过调整参数来可视化观察视锥并构造投影矩阵。
+</p>
+<p>
+在 OpenGL 中，眼空间中的三维点会被投影到 <em>near</em> 平面（投影平面）上。下面的示意图展示了眼空间中的点 (x<sub>e</sub>, y<sub>e</sub>, z<sub>e</sub>) 如何投影到 <em>near</em> 平面上的 (x<sub>p</sub>, y<sub>p</sub>, z<sub>p</sub>)。
+</p>
+<div class="flexrow" style="gap:20px">
+<figure style="flex:1 1 360px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix03.png" alt="视锥俯视图">
+<figcaption>视锥俯视图</figcaption>
+</figure>
+<figure style="flex:1 1 360px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix04.png" alt="视锥侧视图">
+<figcaption>视锥侧视图</figcaption>
+</figure>
+</div>
+<p style="clear:both">
+从视锥俯视图可知，眼空间的 x 坐标 x<sub>e</sub> 映射到 x<sub>p</sub>，可通过相似三角形的比例关系计算得到；
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq01.png" width="199" height="92" alt="">
+</p>
+<p>
+从视锥侧视图可知，y<sub>p</sub> 也以类似方式计算；
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq02.png" width="194" height="93" alt="">
+</p>
+<p>
+注意：x<sub>p</sub> 和 y<sub>p</sub> 都依赖于 z<sub>e</sub>；它们与 -z<sub>e</sub> 成反比。换句话说，它们都要除以 -z<sub>e</sub>。这是构造 GL_PROJECTION 矩阵的第一条重要线索。眼坐标乘以 GL_PROJECTION 矩阵后，裁剪坐标仍然是 <a href="https://www.songho.ca/math/homogeneous/homogeneous.html">齐次坐标</a>。最终通过除以裁剪坐标的 w 分量，得到归一化设备坐标（NDC）。（<em>更多细节见 <a href="https://www.songho.ca/opengl/gl_transform.html">OpenGL 变换</a>。</em>）
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_transform08.png" width="287" height="99" alt="裁剪坐标">
+<span>,&nbsp;&nbsp;&nbsp;</span>
+<img src="https://www.songho.ca/opengl/files/gl_transform12.png" width="221" height="74" alt="归一化设备坐标">
+</p>
+<p>
+因此，我们可以将裁剪坐标的 w 分量设为 -z<sub>e</sub>。于是 GL_PROJECTION 矩阵的第 4 行变为 (0, 0, -1, 0)。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq03.png" width="459" height="99" alt="">
+</p>
+<p>
+接下来，我们用线性关系将 x<sub>p</sub> 和 y<sub>p</sub> 映射到 NDC 的 x<sub>n</sub> 和 y<sub>n</sub>；[l, r] &rArr; [-1, 1]，[b, t] &rArr; [-1, 1]。
+</p>
+<div class="flexrow">
+<figure style="flex:1 1 210px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix05.png" alt="">
+<figcaption>从 x<sub>p</sub> 映射到 x<sub>n</sub></figcaption>
+</figure>
+<div style="flex:1 1 457px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq04.png" class="responsive" alt="">
+</div>
+</div>
+<hr>
+
+<div class="flexrow">
+<figure style="flex:1 1 210px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix06.png" alt="">
+<figcaption>从 y<sub>p</sub> 映射到 y<sub>n</sub></figcaption>
+</figure>
+<div style="flex:1 1 451px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq05.png" class="responsive" alt="">
+</div>
+</div>
+<p>
+&nbsp;
+</p>
+
+<p>
+然后，将 x<sub>p</sub> 和 y<sub>p</sub> 代入上述方程。
+</p>
+<div class="flexrow" style="gap:10px">
+<div style="flex:1 1 340px; padding-right:10px; border-right:1px solid #999;">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq06.png" class="responsive" alt="">
+</div>
+<div style="flex:1 1 336px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq07.png" class="responsive" alt="">
+</div>
+</div>
+<p>
+注意：为了便于透视除法（x<sub>c</sub>/w<sub>c</sub>、y<sub>c</sub>/w<sub>c</sub>），我们让每个方程的两项都能被 -z<sub>e</sub> 整除。而前面已将 w<sub>c</sub> 设为 -z<sub>e</sub>，括号内的项就成为裁剪坐标的 x<sub>c</sub> 和 y<sub>c</sub>。
+</p>
+<p>
+由这些方程，我们可以得到 GL_PROJECTION 矩阵的第 1 行和第 2 行。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq08.png" width="342" height="176" alt="">
+</p>
+
+<p>
+现在只剩 GL_PROJECTION 矩阵的第 3 行需要求解。求 z<sub>n</sub> 与前面略有不同，因为眼空间中的 z<sub>e</sub> 总是投影到 near 平面上的 -n。但我们需要唯一的 z 值用于裁剪和深度测试。此外，我们还应该能够对其进行反投影（逆变换）。由于已知 z 不依赖于 x 或 y，我们借用 w 分量来建立 z<sub>n</sub> 与 z<sub>e</sub> 的关系。因此，可以将 GL_PROJECTION 矩阵的第 3 行写成如下形式。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq10.png" width="640" height="176" alt="">
+</p>
+<p>
+在眼空间中，w<sub>e</sub> 等于 1。因此方程变为：
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq11.png" width="127" height="46" alt="">
+</p>
+<p>
+为了求系数 <em>A</em> 和 <em>B</em>，我们使用 (z<sub>e</sub>, z<sub>n</sub>) 的对应关系：(-n, -1) 和 (-f, 1)，并将它们代入上述方程。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq12.png" width="445" height="119" alt="">
+</p>
+<p>
+为求解 <em>A</em> 和 <em>B</em>，先改写方程 (1) 得到 B；
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq13.png" width="182" height="21" alt="">
+</p>
+<p>将方程 (1') 代入方程 (2) 中的 <em>B</em>，然后求解 A；
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq14.png" width="278" height="128" alt="">
+</p>
+<p>将 <em>A</em> 代入方程 (1) 以求 <em>B</em>；
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq15.png" width="608" height="198" alt="">
+</p>
+<p>
+我们求出了 <em>A</em> 和 <em>B</em>。因此，z<sub>e</sub> 与 z<sub>n</sub> 的关系变为：
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq17.png" width="276" height="55" alt="">
+</p>
+<p>
+最终，我们得到了 GL_PROJECTION 矩阵的所有元素。完整的投影 <a href="https://www.songho.ca/opengl/gl_matrix.html">矩阵</a> 为：
+</p>
+<figure class="w40">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq16.png" width="260" height="187" alt="OpenGL 透视投影矩阵">
+<figcaption>OpenGL 透视投影矩阵</figcaption>
+</figure>
+
+<p>
+该投影 <a href="https://www.songho.ca/opengl/gl_matrix.html">矩阵</a> 适用于一般视锥。如果观察体积是对称的，即 <img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq18.png" width="58" height="14" alt=""> 且 <img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq19.png" width="60" height="14" alt="">，则可简化为：
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq20.png" width="413" height="285" alt="">
+</p>
+<p>
+在继续之前，请再看一遍 z<sub>e</sub> 与 z<sub>n</sub> 的关系，即方程 (3)。你会发现它是一个有理函数，z<sub>e</sub> 与 z<sub>n</sub> 之间是非线性关系。这意味着在 <em>near</em> 平面附近精度非常高，而在 <em>far</em> 平面附近精度非常低。如果范围 [-n, -f] 变得很大，就会导致深度精度问题（z-fighting）；在 <em>far</em> 平面附近，z<sub>e</sub> 的微小变化不会影响 z<sub>n</sub> 的值。<em>n</em> 与 <em>f</em> 之间的距离应尽可能短，以减小深度缓冲精度问题。
+</p>
+<figure>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix07.png" width="650" height="200" alt="深度精度比较">
+<figcaption>深度缓冲精度比较</figcaption>
+</figure>
+
+
+<!-- google ad: main ============================ -->
+<div>
+&nbsp;
+</div>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8351951494359118" crossorigin="anonymous">
+</script>
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8351951494359118" data-ad-slot="3891934153" data-ad-format="auto" data-full-width-responsive="true">
+</ins>
+<script>
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+<h2 id="infinite">无限远平面透视矩阵</h2>
+<p>
+通过将透视矩阵第三行中的 far 平面设为 &infin;，透视投影矩阵可以简化。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq31.png" width="174" height="106" alt="无限远 far 值">
+</p>
+<p>
+因此，带无限远平面的一般与对称透视投影矩阵分别变为：
+</p>
+<div class="flexrow" style="gap:30px">
+<figure style="flex:0 1 221px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq32.png" width="221" height="177" alt="一般透视矩阵">
+<figcaption>一般无限远平面透视矩阵</figcaption>
+</figure>
+<figure style="flex:0 1 183px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq33.png" width="183" height="175" alt="对称透视矩阵">
+<figcaption>对称无限远平面透视矩阵</figcaption>
+</figure>
+</div>
+<p>
+注意：无限远投影矩阵仍然存在深度精度误差。
+</p>
+
+<h2 id="fov">带视场角（FOV）的透视矩阵</h2>
+<p>
+在给定 near、far 平面以及特定窗口尺寸时，很难恰当地确定透视投影所需的 4 个参数（left、right、top 和 bottom）。你可以从垂直/水平视场角以及宽高比（width/height）方便地推导出这 4 个参数。不过，这些转换仅适用于对称透视投影矩阵。
+</p>
+<h3 id="vfov">使用垂直 FOV</h3>
+<div class="flexrow">
+<figure class="ml30" style="flex:1 0 50%">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix14.png" alt="带垂直 FOV 的透视矩阵">
+<figcaption>带垂直 FOV 的透视投影</figcaption>
+</figure>
+<p>
+如果已知垂直视场角为 &theta;，以及屏幕宽度（<em>w</em>）和高度（<em>h</em>），则可用直角三角形计算 left、right、top 和 bottom 参数。首先，用半垂直 FOV 角的正切求半高（<em>top</em>），然后用屏幕宽高比（<em>w / h</em>）计算半宽（<em>right</em>）。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq34.png" width="142" height="154">
+</p>
+</div>
+<pre><code class="codeblock ml30">
+<span class="comment">// 用垂直 FOV 创建对称视锥</span>
+<span class="comment">// 将 4 个参数 (fovy, aspect=w/h, near, far)</span>
+<span class="comment">// 转换为 6 个参数 (l, r, b, t, n, f) </span>
+Matrix4 makeFrustum(float fovY, float aspectRatio, float front, float back)
+{
+    const float DEG2RAD = acos(-1.0f) / 180;
+
+    float tangent = tan(fovY/2 * DEG2RAD);    <span class="comment">// 半 fovY 的正切</span>
+    float top = front * tangent;              <span class="comment">// near 平面半高</span>
+    float right = top * aspectRatio;          <span class="comment">// near 平面半宽</span>
+
+    <span class="comment">// 参数: left, right, bottom, top, near(front), far(back)</span>
+    Matrix4 matrix;
+    matrix[0]  =  front / right;
+    matrix[5]  =  front / top;
+    matrix[10] = -(back + front) / (back - front);
+    matrix[11] = -1;
+    matrix[14] = -(2 * back * front) / (back - front);
+    matrix[15] =  0;
+    return matrix;
+}
+
+</code></pre>
+
+<h3 id="hfov">使用水平 FOV</h3>
+<div class="flexrow">
+<figure class="ml30" style="flex:1 0 50%">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix15.png" alt="带水平 FOV 的透视矩阵">
+<figcaption>带水平 FOV 的透视投影</figcaption>
+</figure>
+<p>
+首先，用半水平 FOV 角的正切计算半宽（right）。然后，用屏幕宽高比（<em>h / w</em>）计算半高（top）。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq35.png" width="146" height="159">
+</p>
+</div>
+<pre><code class="codeblock ml30">
+<span class="comment">// 用水平 FOV 创建对称视锥</span>
+<span class="comment">// 将 4 个参数 (fovx, aspect=w/h, near, far)</span>
+<span class="comment">// 转换为 6 个参数 (l, r, b, t, n, f) </span>
+Matrix4 makeFrustum(float fovX, float aspectRatio, float front, float back)
+{
+    const float DEG2RAD = acos(-1.0f) / 180;
+
+    float tangent = tan(fovX/2 * DEG2RAD);    <span class="comment">// 半 fovX 的正切</span>
+    float right = front * tangent;            <span class="comment">// near 平面半宽</span>
+    float top = right / aspectRatio;          <span class="comment">// near 平面半高</span>
+
+    <span class="comment">// 参数: left, right, bottom, top, near(front), far(back)</span>
+    Matrix4 matrix;
+    matrix[0]  =  front / right;
+    matrix[5]  =  front / top;
+    matrix[10] = -(back + front) / (back - front);
+    matrix[11] = -1;
+    matrix[14] = -(2 * back * front) / (back - front);
+    matrix[15] =  0;
+    return matrix;
+}
+
+</code></pre>
+
+
+<!-- google ad: main ============================ -->
+<div>
+&nbsp;
+</div>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8351951494359118" crossorigin="anonymous">
+</script>
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8351951494359118" data-ad-slot="3891934153" data-ad-format="auto" data-full-width-responsive="true">
+</ins>
+<script>
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+
+<h2 id="ortho">正交投影</h2>
+<figure class="fl w70">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix02.png" alt="OpenGL 正交体积与 NDC">
+<figcaption>正交体积与归一化设备坐标（NDC）</figcaption>
+</figure>
+<p>
+构造正交投影的 GL_PROJECTION <a href="https://www.songho.ca/opengl/gl_matrix.html">矩阵</a> 比透视模式简单得多。
+</p>
+<p>
+眼空间中的 x<sub>e</sub>、y<sub>e</sub> 和 z<sub>e</sub> 分量都线性映射到 NDC。我们只需将一个长方体体积缩放到立方体，再平移到原点。下面用线性关系求出 GL_PROJECTION 的各个元素。
+</p>
+<p style="clear:both;">
+&nbsp;
+</p>
+
+<div class="flexrow" style="gap:10px">
+<figure style="flex:1 1 210px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix08.png" alt="">
+<figcaption>从 x<sub>e</sub> 映射到 x<sub>n</sub></figcaption>
+</figure>
+<div class="center" style="flex:1 1 456px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq21.png" class="responsive" alt="">
+</div>
+</div>
+<hr>
+
+<div class="flexrow" style="gap:10px">
+<figure style="flex:1 1 210px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix09.png" alt="">
+<figcaption>从 y<sub>e</sub> 映射到 y<sub>n</sub></figcaption>
+</figure>
+<div class="center" style="flex:1 1 450px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq22.png" class="responsive" alt="">
+</div>
+</div>
+<hr>
+
+<div class="flexrow" style="gap:10px">
+<figure style="flex:1 1 210px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix10.png" alt="">
+<figcaption>从 z<sub>e</sub> 映射到 z<sub>n</sub></figcaption>
+</figure>
+<div class="center" style="flex:1 1 477px">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq23.png" class="responsive" alt="">
+</div>
+</div>
+<p>
+&nbsp;
+</p>
+
+<p>
+由于正交投影不需要 w 分量，GL_PROJECTION 矩阵的第 4 行保持为 (0, 0, 0, 1)。因此，正交投影的完整 GL_PROJECTION <a href="https://www.songho.ca/opengl/gl_matrix.html">矩阵</a> 为：
+</p>
+<figure class="w30">
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq24.png" alt="OpenGL 正交投影矩阵">
+<figcaption>OpenGL 正交投影矩阵</figcaption>
+</figure>
+<p>
+如果观察体积是对称的，即 <img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq18.png" width="58" height="14" alt=""> 且 <img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq19.png" width="60" height="14" alt="">，还可以进一步简化。
+<br>
+<img src="https://www.songho.ca/opengl/files/gl_projectionmatrix_eq25.png" width="393" height="261" alt="OpenGL 对称正交投影矩阵">
+</p>
+
+
+<!-- footer -->
+<div id="footer">
+<div style="float:left">
+&copy;&nbsp;2008 - 2024 <a href="mailto:song.ahn@gmail.com">Song Ho Ahn (<span lang="ko">안성호</span>)</a>
+</div>
+<div style="float:right">
+<img src="https://www.songho.ca/files/html5_gray32.png" width="32" height="32" alt="HTML5 Logo">
+</div>
+<div style="float:right">
+<a href="https://validator.w3.org/check?uri=referer"><img src="https://www.songho.ca/files/I_heart_validator.png" width="80" height="15" alt="HTML Validator"></a>
+</div>
+</div>
+
+<!-- nav -->
+<div style="clear:both; font-size:80%">
+<a href="https://www.songho.ca/opengl/gl_transform.html#projection">&larr;返回</a>
+</div>
+
+
+<div>
+&nbsp;
+</div>
+
+<!-- google ad: main ============================ -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8351951494359118" crossorigin="anonymous">
+</script>
+<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8351951494359118" data-ad-slot="3891934153" data-ad-format="auto" data-full-width-responsive="true">
+</ins>
+<script>
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+<div>
+&nbsp;
+</div>
+
+<!-- DISQUS block =============================== -->
+<div id="commentblock">
+<div id="buttonDisqus" class="cssbutton">
+隐藏评论
+</div>
+
+<div id="disqus_thread">
+</div>
+<script>
+var disqus_shortname = 'songho'; // required: replace example with your forum shortname
+//var disqus_identifier = 'test';
+(function() {
+    var dsq=document.createElement('script'); dsq.type='text/javascript'; dsq.async=true;
+    dsq.src='https://'+disqus_shortname+'.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>
+请启用 JavaScript 以查看 <a href="https://disqus.com/?ref_noscript">Disqus 评论。</a>
+</noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+<!-- END OF DISQUS BLOCK ======================== -->
+
+
+</div>
+</div> <!-- END OF LEFTBLOCK -->
+
+
+<!-- right content block ============================================ -->
+<div id="rightblock">
+<div class="innerblock">
+
+<!-- Table Of Contents block ======================= -->
+<nav id="toc">
+<strong>本页内容：</strong>
+<ul>
+<li><a href="#overview">概述</a></li>
+<li><a href="#perspective">透视投影</a></li>
+<li><a href="#infinite">无限远平面透视矩阵</a></li>
+<li><a href="#fov">带视场角（FOV）的透视矩阵</a></li>
+<li><a href="#ortho">正交投影</a></li>
+</ul>
+</nav>
+
+<!-- google ad: side ============================ -->
+<div id="adside">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8351951494359118" crossorigin="anonymous">
+</script>
+<ins class="adsbygoogle" style="display:block;" data-ad-client="ca-pub-8351951494359118" data-ad-slot="6727541559" data-ad-format="rectangle" data-full-width-responsive="true">
+</ins>
+<script>
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+
+</div>
+</div>
+<!-- END OF RIGHT BLOCK ============================================= -->
+
+</div>
+<!-- END OF MAIN BLOCK ============================================== -->
+
+</div>
+<!-- END OF WRAP ==================================================== -->
+
+</body>
+</html>
